@@ -1,13 +1,13 @@
 import sys
 import os
 from PySide6.QtCore import Qt, QUrl, QSizeF
-from PySide6.QtWidgets import (
+from PySide6.QtWidgets import (QMainWindow, QToolBar,
     QApplication, QWidget, QHBoxLayout, QVBoxLayout,
     QPushButton, QSlider, QLabel, QFileDialog, QGraphicsView, QGraphicsScene, QGraphicsPixmapItem
 )
 from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PySide6.QtMultimediaWidgets import QGraphicsVideoItem
-from PySide6.QtGui import QPainter, QPixmap
+from PySide6.QtGui import QPainter, QPixmap, QAction, QIcon
 
 
 def format_time(ms):
@@ -306,7 +306,7 @@ class VideoPlayer(QWidget):
             self.next_frame()
         elif event.key() == Qt.Key_P: ##Qt.Key_Space Jebane QT xD
             self.pause_play()
-        elif event.key() == Qt.Key_B:
+        elif event.key() == Qt.Key_Q:
             self.back_5s()
         elif event.key() == Qt.Key_F:
             self.parent1.show_fullscreen(self) ##thats convoluted but works!
@@ -320,12 +320,17 @@ class VideoPlayer(QWidget):
             super().keyPressEvent(event)
 
 
-class DualPlayer(QWidget):
+class DualPlayer(QMainWindow):
     def __init__(self, path1=None, path2=None):
         #TODO Layout - you have to resize for players to fill the space - especially when you have one video
         super().__init__()
         self.setWindowTitle("Dual Video Player")
         self.resize(1200, 600)
+
+        # --- Setup Central Widget ---
+        # Create a central widget to hold your original layout
+        central_widget = QWidget()
+        self.setCentralWidget(central_widget)
 
         self.isFullscreen = False
 
@@ -366,17 +371,60 @@ class DualPlayer(QWidget):
         controls.addWidget(self.play_both_btn)
         controls.addWidget(self.pause_both_btn)
 
-        layout = QVBoxLayout()
+        layout = QVBoxLayout(central_widget)
         layout.addLayout(videos)
         layout.addLayout(controls)
-        self.setLayout(layout)
+        ##self.setLayout(layout)
 
         self.play_both()
         self.pause_both()
 
+        # --- TOOLBAR SETUP ---
+        self._create_toolbar()  # Call the new method to build the toolbar
+
         # self.left.fit_best_size()
         # if self.has_two_videos:
         #     self.right.fit_best_size()
+
+    def _create_toolbar(self):
+        # 1. Create a QToolBar instance
+        toolbar = QToolBar("Main Controls")
+        self.addToolBar(toolbar)
+
+        # 2. Create QActions for each toolbar button
+        # NOTE: QAction handles both menu items and toolbar buttons
+
+        # Action 1: Fullscreen Toggle
+        fullscreen_action = QAction(QIcon("path/to/icon/fullscreen.png"), "Toggle Fullscreen", self)
+        fullscreen_action.setStatusTip("Toggle Fullscreen Mode")
+        # fullscreen_action.triggered.connect(self.toggle_fullscreen)  # Connect the event
+        toolbar.addAction(fullscreen_action)
+        #
+        # # Action 2: Open New File
+        open_action_left = QAction(QIcon(""), "Open Left Video", self)
+        open_action_left.setStatusTip("Open a new video file")
+        open_action_left.triggered.connect(self.onOpenLeft)  # Connect the event
+        toolbar.addAction(open_action_left)
+
+        open_action_right = QAction(QIcon(""), "Open Right Video", self)
+        open_action_right.setStatusTip("Open a new video file")
+        open_action_right.triggered.connect(self.onOpenRight)  # Connect the event
+        toolbar.addAction(open_action_right)
+        #
+        # # Add a separator for visual grouping
+        # toolbar.addSeparator()
+        #
+        # # Action 3: Sync Video Times
+        # sync_action = QAction("Sync Times", self)  # You can use text instead of icon
+        # sync_action.setStatusTip("Synchronize playback time of both videos")
+        # sync_action.triggered.connect(self.sync_video_times)
+        # toolbar.addAction(sync_action)
+
+    def onOpenLeft(self):
+        self.changeFile(True)
+
+    def onOpenRight(self):
+        self.changeFile(False)
 
     def play_both(self):
         self.left.play()
@@ -432,12 +480,19 @@ class DualPlayer(QWidget):
             self.left.pause()
         else:
             path2, _ = QFileDialog.getOpenFileName(
-                self, "Select Left Video", "", "Video Files (*.mp4 *.mov *.avi *.mkv)"
+                self, "Select Right Video", "", "Video Files (*.mp4 *.mov *.avi *.mkv)"
             )
-            self.right.player.setSource(path2)
-            self.has_two_videos = True
+            if not(self.has_two_videos):
+                self.right = VideoPlayer(self, path2)
+                self.videos.addWidget(self.right)
+                self.has_two_videos = True
+                self.update()
+                self.repaint()
+            else:
+                self.right.player.setSource(path2)
             self.right.play()
             self.right.pause()
+
 
     def changeTempo(self, speed_up):
         #TODO
